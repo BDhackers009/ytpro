@@ -23,7 +23,7 @@ fi
 echo "Downloading video,wait.."
 echo ""
 echo ""
-echo "Download in ${location}"
+echo "Downloading Video  in ${location}"
 sleep 3
 clear
 yt-dlp ${url}
