@@ -1,0 +1,40 @@
+#!/bin/bash
+
+url=$1
+location="/sdcard/Youtube"
+echo "Options:- "
+echo ""
+echo "[1] play audio (without download)"
+echo ""
+echo "[2] download video (with yt-dlp)"
+echo ""
+read -p "Select Option (default 1): " select 
+echo ""
+
+if [ ${select} == "1" ]; then
+  echo "playing audio,wait..."
+  clear
+  mpv ${url}
+elif [ ${select} == "2" ]; then
+    if [[ -d ${location} ]]; then
+  	echo "downloading video,wait.."
+    echo "downloading in ${location}"
+    yt-dlp ${url}
+    else
+    	echo "${location} not found"
+		echo ""
+    	echo "creating...."
+    	mkdir ${location}
+    	echo "downloaing video,wait.."
+    	echo ""
+    	echo "downloading in ${location}"
+    	yt-dlp ${url}
+    	fi
+else
+  clear
+  mpv ${url}
+fi
+
+
+
+
