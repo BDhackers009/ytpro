@@ -1,14 +1,41 @@
 #!/bin/bash
-
+##Whole code is fully written by BDhaCkers009 please dont copy or if you copy then give credit
 url=$1
 location="/sdcard/Youtube"
+pak() {
+#### spspecial thanks to this blog ####https://joel28.ml/2021/yt-dlp-on-android-using-termux.html
+echo "Video Resolution:-"
+echo "[1] Download Video in 720p or 720p60fps"
+echo
+echo
+echo "[2] Download video in 1080p or 1080p60fps"
+echo
+echo
+read -p "Select resolution (default 1): " res
+
+if [[ ${res} == "1" ]]; then
+        sed -i 's/299/298/' $HOME/.config/yt-dlp/config && sed -i 's/137/136/' $HOME/.config/yt-dlp/config
+elif [[ ${res} == "2" ]]; then
+        sed -i 's/298/299/' $HOME/.config/yt-dlp/config && sed -i 's/136/137/' $HOME/.config/yt-dlp/config
+else
+        sed -i 's/299/298/' $HOME/.config/yt-dlp/config && sed -i 's/137/136/' $HOME/.config/yt-dlp/config
+fi
+echo "Downloading video,wait.."
+echo ""
+echo ""
+echo "Download in ${location}"
+sleep 3
+clear
+yt-dlp ${url}
+}
+
 echo "Options:- "
 echo ""
 echo "[1] play audio (without download)"
 echo ""
 echo "[2] download video (with yt-dlp)"
 echo ""
-read -p "Select Option (default 1): " select 
+read -p "Select Option (default 1): " select
 echo ""
 
 if [ ${select} == "1" ]; then
@@ -17,19 +44,11 @@ if [ ${select} == "1" ]; then
   mpv ${url}
 elif [ ${select} == "2" ]; then
     if [[ -d ${location} ]]; then
-  	echo "downloading video,wait.."
-    echo "downloading in ${location}"
-    yt-dlp ${url}
-    else
-    	echo "${location} not found"
-		echo ""
-    	echo "creating...."
-    	mkdir ${location}
-    	echo "downloaing video,wait.."
-    	echo ""
-    	echo "downloading in ${location}"
-    	yt-dlp ${url}
-    	fi
+    pak
+	else
+		mkdir ${location}
+    	pak
+    fi
 else
   clear
   mpv ${url}
