@@ -1,154 +1,69 @@
 #!/bin/bash
-c() {
+
+starts() {
 	clear
+	if [[ ! -d "/data/data/com.termux/files/home" ]]; then
+		echo -e "This script is only for TERMUX\n"
+		echo -e "Please wait for another Update\n"
+		exit 0
+	fi
+
+	if [[ ! -d "$HOME/storage" ]]; then
+		echo -e "Setting up Storage\n"
+		echo -e "Please Allow Storage Permission\n"
+		sleep 2
+		termux-setup-storage
+	fi
 }
-setup_storage() {
-if [ -d $HOME/storage ]; then
-	echo ""
-else
-	echo "setting up storage permission..."
-	echo ""
-	echo "please press allow to setup storage"
-	sleep 2
-	termux-setup-storage
-fi
-}
+
 install_pkgs() {
-pkg1="python"
-pkg2="mpv"
-pkg3="aria2"
-pkg4="ffmpeg"
-pip="pip3"
-pip1="yt-dlp"
-pip2="youtube-dl"
+	pkgs=(python mpv ffmpeg)
 
-if [ $(command -v ${pkg1}) ]; then
-	echo "${pkg1} already installed"
-	sleep 1
-	c
-else
-	echo "installing ${pkg1}"
-	sleep 1 
-	c
-	pkg up -y && pkg i ${pkg1} -y
-fi
+	for i in "${pkgs[@]}"; do
+		if [[ ! $(command -v "$i") ]]; then
+			type -p "$i" &>/dev/null || {
+				echo -e "\nInstalling $i\n"
+				pkg install -y "$i"
+				sleep 1
+			}
+		fi
+	done
 
-if [ $(command -v ${pkg2}) ]; then
-	echo "${pkg2} already installed"
-	sleep 1
-	c
-else
-	echo "installing ${pkg2}"
-	sleep 1 
-	c
-	pkg up -y && pkg i ${pkg2} -y
-fi
-
-if [ $(command -v aria2c) ]; then
-	echo "${pkg3} already installed"
-	sleep 1
-	c
-else
-	echo "installing ${pkg3}"
-	sleep 1
-	c
-	pkg up -y && pkg i ${pkg3} -y
-fi
-
-
- 
-if [ $(command -v ${pkg4}) ]; then
-	echo "${pkg4} already installed"
-	sleep 1
-	c
-else
-	echo "installing ${pkg4}"
-	sleep 1
-	c
-	pkg up -y && pkg i ${pkg4} -y
-fi
-
-if [ $(command -v ${pip}) ]; then
-	echo "${pip} already installed"
-	sleep 1
-	c
-else
-	echo "installing ${pip}"
-	sleep 1 
-	c
-	aria2c https://bootstrap.pypa.io/get-pip.py && python get-pip.py && rm get-pip.py
-fi
-
-
-if [ $(command -v ${pip1}) ]; then
-	echo "${pip1} already installed"
-	sleep 1
-	c
-else
-	echo "installing ${pkg2}"
-	sleep 1 
-	c
-	pip3 install ${pip1}
-fi
-
-
-if [ $(command -v ${pip2}) ]; then
-	echo "${pip1} already installed"
-	sleep 1
-	c
-else
-	echo "installing ${pkg2}"
-	sleep 1 
-	c
-	pip3 install ${pip2}
-fi
+	if [[ ! $(command -v pip3) ]]; then
+		curl -k --progress-bar -L "https://bootstrap.pypa.io/get-pip.py" -o "gpip.py"
+		python gpip.py
+		rm gpip.py
+	fi
+	if [[ ! $(command -v yt-dlp) ]]; then
+		pip3 install yt-dlp
+	fi
 }
-setup_tuo() {
-c
-dir="$HOME/bin"
-file="$HOME/bin/termux-url-opener"
-ytdir="/sdcard/YouTube"
-cdir="$HOME/.config/yt-dlp"
-cfile="$HOME/.config/yt-dlp/config"
-pdir="$HOME/ytpro"
-if [ -d ${dir} ]; then
-	echo ""
-else
-	echo "creating ${dir}"
-	mkdir ${dir}
-	sleep 1
-	c
-fi
 
-if [ -d ${ytdir} ]; then
-	echo ""
-else
-	echo "creating ${ytdir}"
-	mkdir ${ytdir}
-	sleep 1
-	c
-fi
+config_s() {
+	directory=("$HOME/bin" "$HOME/.config/yt-dlp" "/sdcard/YouTube")
+	for d in "${directory[@]}"; do
+		if [[ ! -d "$d" ]]; then
+			echo "Creating Directory : $d"
+			mkdir $d
+		fi
+	done
 
-if [ -f ${file} ]; then
-	mv ${file} ${file}.bak
-	cp ${pdir}/termux-url-opener ${dir} && chmod +x ${file}
-else
-	cp ${pdir}/termux-url-opener ${dir} && chmod +x ${file}
-fi
-if [ -d ${cdir} ]; then
-	echo ""
-else
-	mkdir -p  ${cdir}
-fi
-
-if [ -f ${cfile} ]; then
-	mv ${cfile} ${cfile}.bak
-	cp ${pdir}/config ${cfile}
-else
-    cp ${pdir}/config ${cfile}
-fi
+	confs=("$HOME/bin/termux-url-opener" "$HOME/.config/yt-dlp/config")
+	for c in "${confs[@]}"; do
+		if [[ -e "$d" ]]; then
+			echo "Backing Up : $c"
+			mv $c "${c}.bak"
+		fi
+		if [[ -e $(basename $c) ]]; then
+			cp $(basename $c) "$c"
+			chmod 777 "$c"
+		else
+			echo "\nSome Config files not found,,,Clone Again\n"
+			exit 0
+		fi
+	done
 }
-c
-setup_storage
+
+starts
 install_pkgs
-setup_tuo
+config_s
