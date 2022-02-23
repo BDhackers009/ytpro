@@ -62,6 +62,8 @@ config_s() {
 			exit 0
 		fi
 	done
+	
+	echo -e "\nConfiguration Completed !!\n"
 }
 
 starts
