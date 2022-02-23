@@ -50,7 +50,7 @@ config_s() {
 
 	confs=("$HOME/bin/termux-url-opener" "$HOME/.config/yt-dlp/config")
 	for c in "${confs[@]}"; do
-		if [[ -e "$d" ]]; then
+		if [[ -e "$c" ]]; then
 			echo "Backing Up : $c"
 			mv $c "${c}.bak"
 		fi
