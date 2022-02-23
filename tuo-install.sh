@@ -58,7 +58,7 @@ config_s() {
 			cp $(basename $c) "$c"
 			chmod 777 "$c"
 		else
-			echo "\nSome Config files not found,,,Clone Again\n"
+			echo -e "\nSome Config files not found,,,Clone Again\n"
 			exit 0
 		fi
 	done
