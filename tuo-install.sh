@@ -44,7 +44,7 @@ config_s() {
 	for d in "${directory[@]}"; do
 		if [[ ! -d "$d" ]]; then
 			echo "Creating Directory : $d"
-			mkdir $d
+			mkdir -p $d
 		fi
 	done
 
