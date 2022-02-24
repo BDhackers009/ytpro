@@ -11,6 +11,7 @@ echo
 echo "[2] Download video in 1080p or 1080p60fps"
 echo
 echo
+echo
 read -p "Select resolution (default 1): " res
 
 if [[ ${res} == "1" ]]; then
@@ -35,6 +36,11 @@ echo "[1] play audio (without download)"
 echo ""
 echo "[2] download video (with yt-dlp)"
 echo ""
+echo "[3] download only audio (bestaudio quality)"
+echo 
+echo "[4] download only audio (mp3)"
+echo 
+echo 
 read -p "Select Option (default 1): " select
 echo ""
 
@@ -43,12 +49,18 @@ if [ ${select} == "1" ]; then
   clear
   mpv ${url}
 elif [ ${select} == "2" ]; then
-    if [[ -d ${location} ]]; then
+  if [[ -d ${location} ]]; then
     pak
-	else
-		mkdir ${location}
-    	pak
-    fi
+  else
+    mkdir ${location}
+    pak
+  fi
+
+elif [[ ${select} == "3" ]]; then
+  yt-dlp  -f 'ba' ${url} --sponsorblock-remove all
+
+elif [[ ${select} == "4" ]]; then
+  yt-dlp -f 'ba' -x --audio-format mp3 ${url} --sponsorblock-remove all
 else
   clear
   mpv ${url}
