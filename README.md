@@ -7,7 +7,9 @@ ytpro is a script for playing and downloading youtube videos/audios from termux.
 1. Play youtube audio without download.
 2. Run audio in background.
 3. Download videos in 720p and 1080p
-4. comming soon...:)
+4. Download audio in best available quality.
+5. Download audio in mp3
+6. comming soon..:)
 
 ## Installation:- 
 
