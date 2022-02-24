@@ -40,15 +40,21 @@ Just open _YouTube app_  **(not in any browser)** then press share button of you
 
 1. Play audio ( without download)
 2. Download video (with yt-dlp)
+3. Download only audio (bestaudio quality)
+4. Download only audio (mp3)
 
-Now if you want to listen the audio then select 1 and press enter it will play the audio. But if you want to download the video then select 2 and press enter, after pressing enter you will see resolution select as your wish.  
+Now if you want to listen the audio then select 1 and press enter it will play the audio. But if you want to download the video then select 2 and press enter, after pressing enter you will see resolution select as your wish.If you want to download only audio then select 3 or 4.
 
-After downloading the video you can find it on your **Phone Storage** there you will find **YouTube** named folder and inside that folder you will find the downloaded video. 
+After downloading the  audio or video you can find it on your **Phone Storage** there you will find **YouTube** named folder and inside that folder you will find the downloaded audio or video. 
 
+
+### Special Thanks:
+- [**Tahmid Rayat (HTR-TECH)**](https://github.com/htr-tech)
 
 ## Note:-
 
 This is in beta stage.
+
 
 
 ### Thanks for using my repo :)
