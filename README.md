@@ -19,7 +19,7 @@ pkg upgrade -y
 # install git
 pkg install git -y
 # clone the tool
-git clone git://github.com/BDhaCkers009/ytpro.git
+git clone https://github.com/BDhaCkers009/ytpro.git
 
 # navigate to the tools folder
 cd ytpro
@@ -28,11 +28,12 @@ cd ytpro
 
 bash tuo-install.sh
 
-# or 
-chmod +x tuo-install.sh && ./tuo-install.sh
-
+```
 ```
 
+# or 
+chmod +x tuo-install.sh && ./tuo-install.sh
+```
 ## Usage:-
 
 Its usage is very simple. 
