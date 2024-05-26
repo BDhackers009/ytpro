@@ -48,6 +48,9 @@ Now if you want to listen the audio then select 1 and press enter it will play t
 
 After downloading the  audio or video you can find it on your **Phone Storage** there you will find **YouTube** named folder and inside that folder you will find the downloaded audio or video. 
 
+### Video Tutorial: 
+- [**YouTube**](https://youtu.be/hz4F3XLS0b4)
+
 
 ### Special Thanks:
 - [**Tahmid Rayat (HTR-TECH)**](https://github.com/htr-tech)
