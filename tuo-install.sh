@@ -59,8 +59,7 @@ install_dependencies() {
     fi
   fi
 
-  info "Installing/upgrading yt-dlp with pip ..."
-  python -m pip install --upgrade yt-dlp
+  install_pkg_if_missing python-yt-dlp yt-dlp
 }
 
 backup_if_needed() {

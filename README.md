@@ -44,8 +44,8 @@ Installer behavior:
 - verifies Termux environment
 - requests `termux-setup-storage` only when needed
 - installs missing dependencies (`python`, `ffmpeg`, optional `mpv`)
-- installs/updates `yt-dlp` using:
-  - `python -m pip install --upgrade yt-dlp`
+- installs missing `yt-dlp` package using:
+  - `pkg install -y python-yt-dlp`
 - installs scripts to `$HOME/bin`
 - creates timestamped backups before replacing managed files
 
@@ -106,7 +106,7 @@ bash test.sh
   - Restart Termux after granting permission
 
 - **`yt-dlp` missing / outdated**
-  - Run: `python -m pip install --upgrade yt-dlp`
+  - Run: `pkg install -y python-yt-dlp`
   - Re-run installer: `bash tuo-install.sh`
 
 - **Instagram URL fails**
