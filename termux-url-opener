@@ -1,213 +1,71 @@
-#!/data/data/com.termux/files/usr/bin/bash
-set -Eeuo pipefail
+#!/bin/bash
+##Whole code is fully written by BDhaCkers009 please dont copy or if you copy then give credit
+url=$1
+location="/sdcard/Youtube"
+pak() {
+#### spspecial thanks to this blog ####https://joel28.ml/2021/yt-dlp-on-android-using-termux.html
+echo "Video Resolution:-"
+echo "[1] Download Video in 720p or 720p60fps"
+echo
+echo
+echo "[2] Download video in 1080p or 1080p60fps"
+echo
+echo
+echo
+read -p "Select resolution (default 1): " res
 
-YOUTUBE_DIR="/sdcard/YouTube"
-INSTAGRAM_DIR="/sdcard/Instagram"
-
-color() {
-  local code="$1"
-  shift
-  if [[ -t 1 ]]; then
-    printf '\033[%sm%s\033[0m\n' "$code" "$*"
-  else
-    printf '%s\n' "$*"
-  fi
-}
-
-info() { color "1;34" "[INFO] $*"; }
-warn() { color "1;33" "[WARN] $*"; }
-err() { color "1;31" "[ERROR] $*"; }
-
-require_cmd() {
-  local cmd="$1"
-  local message="$2"
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    err "$message"
-    return 1
-  fi
-}
-
-ensure_dir() {
-  local dir="$1"
-  mkdir -p "$dir"
-}
-
-classify_url() {
-  local input="$1"
-  local lower
-  lower=$(printf '%s' "$input" | tr '[:upper:]' '[:lower:]')
-
-  if [[ "$lower" == *"instagram.com"* ]]; then
-    if [[ "$lower" == *"/reel/"* || "$lower" == *"/reels/"* || "$lower" == *"/p/"* || "$lower" == *"/tv/"* ]]; then
-      printf 'instagram\n'
-      return 0
-    fi
-    printf 'instagram_other\n'
-    return 0
-  fi
-
-  if [[ "$lower" == *"youtube.com"* || "$lower" == *"youtu.be/"* ]]; then
-    printf 'youtube\n'
-    return 0
-  fi
-
-  printf 'other\n'
-}
-
-output_template_for_kind() {
-  local kind="$1"
-  if [[ "$kind" == "instagram" ]]; then
-    printf '%s/%%(title).120B-%%(id)s.%%(ext)s\n' "$INSTAGRAM_DIR"
-  else
-    printf '%s/%%(title).120B-%%(uploader|unknown)s.%%(ext)s\n' "$YOUTUBE_DIR"
-  fi
-}
-
-run_yt_dlp() {
-  local kind="$1"
-  shift
-  local out_template
-  out_template=$(output_template_for_kind "$kind")
-
-  ensure_dir "${out_template%/*}"
-  yt-dlp --no-mtime --restrict-filenames -o "$out_template" "$@" "$SHARED_URL"
-}
-
-show_metadata() {
-  yt-dlp --no-warnings --no-download \
-    --print "Title: %(title)s" \
-    --print "Uploader: %(uploader|unknown)s" \
-    --print "Duration: %(duration_string|unknown)s" \
-    --print "ID: %(id)s" \
-    "$SHARED_URL"
-}
-
-play_with_mpv() {
-  if ! command -v mpv >/dev/null 2>&1; then
-    warn "mpv is not installed. Install it with: pkg install mpv"
-    return 1
-  fi
-  mpv "$SHARED_URL"
-}
-
-youtube_download_menu() {
-  local res
-  printf '\nVideo quality:\n'
-  printf '  [1] Up to 720p\n'
-  printf '  [2] Up to 1080p\n'
-  read -r -p "Select resolution (default 1): " res || return 9
-
-  case "${res:-1}" in
-    1)
-      run_yt_dlp youtube -f "bv*[height<=720]+ba/b[height<=720]/best[height<=720]/best"
-      ;;
-    2)
-      run_yt_dlp youtube -f "bv*[height<=1080]+ba/b[height<=1080]/best[height<=1080]/best"
-      ;;
-    *)
-      warn "Unknown resolution, using up to 720p."
-      run_yt_dlp youtube -f "bv*[height<=720]+ba/b[height<=720]/best[height<=720]/best"
-      ;;
-  esac
-}
-
-youtube_menu() {
-  local select
-  printf '\nYouTube options:\n'
-  printf '  [1] Play audio/video with mpv (no download)\n'
-  printf '  [2] Download video (yt-dlp)\n'
-  printf '  [3] Download audio only (best available)\n'
-  printf '  [4] Download audio as mp3 (requires ffmpeg)\n'
-  printf '  [5] Show metadata/preview\n'
-  printf '  [0] Cancel\n'
-  read -r -p "Select option (default 1): " select || return 9
-
-  case "${select:-1}" in
-    1) play_with_mpv ;;
-    2) youtube_download_menu ;;
-    3) run_yt_dlp youtube -f "ba/b" --sponsorblock-remove all ;;
-    4)
-      require_cmd ffmpeg "ffmpeg is required for mp3 extraction. Install: pkg install ffmpeg" || return 1
-      run_yt_dlp youtube -f "ba/b" -x --audio-format mp3 --sponsorblock-remove all
-      ;;
-    5) show_metadata ;;
-    0) return 9 ;;
-    *)
-      warn "Invalid choice, defaulting to playback."
-      play_with_mpv
-      ;;
-  esac
-}
-
-instagram_menu() {
-  local select
-  printf '\nInstagram options (public posts/reels/tv only):\n'
-  printf '  [1] Download best available video\n'
-  printf '  [2] Download smaller/data-saver version\n'
-  printf '  [3] Download audio only (if extractable)\n'
-  printf '  [4] Show metadata/preview\n'
-  printf '  [0] Cancel\n'
-  read -r -p "Select option (default 1): " select || return 9
-
-  case "${select:-1}" in
-    1) run_yt_dlp instagram -f "bv*+ba/b" ;;
-    2) run_yt_dlp instagram -f "bv*+ba/b" -S "+size,+res,+br" ;;
-    3)
-      require_cmd ffmpeg "ffmpeg is required for audio extraction. Install: pkg install ffmpeg" || return 1
-      run_yt_dlp instagram -f "ba/b" -x --audio-format mp3
-      ;;
-    4) show_metadata ;;
-    0) return 9 ;;
-    *)
-      warn "Invalid choice, downloading best available video."
-      run_yt_dlp instagram -f "bv*+ba/b"
-      ;;
-  esac
-}
-
-main() {
-  SHARED_URL="${1:-}"
-
-  if [[ -z "$SHARED_URL" ]]; then
-    err "No URL received from Termux share target."
-    err "Usage: termux-url-opener '<url>'"
-    return 2
-  fi
-
-  require_cmd yt-dlp "yt-dlp is missing. Run installer: bash ~/ytpro/tuo-install.sh" || return 1
-
-  ensure_dir "$YOUTUBE_DIR"
-  ensure_dir "$INSTAGRAM_DIR"
-
-  info "Received URL: $SHARED_URL"
-
-  case "$(classify_url "$SHARED_URL")" in
-    instagram)
-      info "Detected Instagram post/reel URL"
-      instagram_menu
-      ;;
-    instagram_other)
-      warn "Instagram URL detected, but not a supported /reel/, /reels/, /p/, or /tv/ URL."
-      return 3
-      ;;
-    youtube)
-      info "Detected YouTube URL"
-      youtube_menu
-      ;;
-    *)
-      warn "Unknown URL type. Showing YouTube-style menu as fallback."
-      youtube_menu
-      ;;
-  esac
-}
-
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  if main "$@"; then
-    exit 0
-  fi
-  status=$?
-  if [[ "$status" -eq 9 ]]; then
-    info "Cancelled by user."
-  fi
-  exit "$status"
+if [[ ${res} == "1" ]]; then
+        sed -i 's/299/298/' $HOME/.config/yt-dlp/config && sed -i 's/137/136/' $HOME/.config/yt-dlp/config
+elif [[ ${res} == "2" ]]; then
+        sed -i 's/298/299/' $HOME/.config/yt-dlp/config && sed -i 's/136/137/' $HOME/.config/yt-dlp/config
+else
+        sed -i 's/299/298/' $HOME/.config/yt-dlp/config && sed -i 's/137/136/' $HOME/.config/yt-dlp/config
 fi
+echo "Downloading video,wait.."
+echo ""
+echo ""
+echo "Downloading Video  in ${location}"
+sleep 3
+clear
+yt-dlp ${url}
+}
+
+echo "Options:- "
+echo ""
+echo "[1] play audio (without download)"
+echo ""
+echo "[2] download video (with yt-dlp)"
+echo ""
+echo "[3] download only audio (bestaudio quality)"
+echo 
+echo "[4] download only audio (mp3)"
+echo 
+echo 
+read -p "Select Option (default 1): " select
+echo ""
+
+if [ ${select} == "1" ]; then
+  echo "playing audio,wait..."
+  clear
+  mpv ${url}
+elif [ ${select} == "2" ]; then
+  if [[ -d ${location} ]]; then
+    pak
+  else
+    mkdir ${location}
+    pak
+  fi
+
+elif [[ ${select} == "3" ]]; then
+  yt-dlp  -f 'ba' ${url} --sponsorblock-remove all
+
+elif [[ ${select} == "4" ]]; then
+  yt-dlp -f 'ba' -x --audio-format mp3 ${url} --sponsorblock-remove all
+else
+  clear
+  mpv ${url}
+fi
+
+
+
+
