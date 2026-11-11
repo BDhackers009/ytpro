@@ -50,10 +50,35 @@ TTY=0
 [ -t 1 ] && TTY=1
 
 if [ "$TTY" = 1 ]; then
-	C0=$'\033[0m' CB=$'\033[1m' CC=$'\033[36m' CG=$'\033[32m' CR=$'\033[31m' CD=$'\033[2m'
+	C0=$'\033[0m' CB=$'\033[1m' CC=$'\033[94m' CG=$'\033[32m' CR=$'\033[31m' CD=$'\033[2m'
 else
 	C0= CB= CC= CG= CR= CD=
 fi
+
+term_cols() {
+	local size size2 cols
+	size=$(stty size 2>/dev/null </dev/tty) || size=$(stty size 2>/dev/null) || size=""
+	cols=${size##* }
+	case $cols in '' | *[!0-9]* | 0) cols=${COLUMNS:-0} ;; esac
+	case $cols in '' | *[!0-9]* | 0) cols=50 ;; esac
+	[ "$cols" -lt 20 ] && cols=20
+	printf '%s' "$cols"
+}
+
+rule() {
+	local w=${1:-$(term_cols)} i
+	[ "$w" -gt 0 ] 2>/dev/null || w=1
+	if [ "$TTY" = 1 ]; then
+		for ((i = 0; i < w; i++)); do printf '─'; done
+	else
+		for ((i = 0; i < w; i++)); do printf '-'; done
+	fi
+}
+
+clear_screen() {
+	[ "$TTY" = 1 ] && printf '\033[H\033[2J'
+	return 0
+}
 
 human_size() {
 	awk -v b="${1:-0}" 'BEGIN {
@@ -91,16 +116,13 @@ notify() {
 }
 
 msgbox() { # title, body
-	local title=$1 body=$2
-	if [ "$UI" = gum ] && [ "$TTY" = 1 ] && have dialog; then
-		dialog --title "$title" --msgbox "$body" 22 78
-		return
-	fi
-	if [ "$UI" = gum ]; then
-		printf '%s\n' "$body" | gum style --border rounded --border-foreground 51 --padding '0 1' --margin '1 0'
-	else
-		printf '\n%s%s%s\n%s\n' "$CB" "$title" "$C0" "$body"
-	fi
+	local title=$1 body=$2 w line
+	w=$(term_cols)
+	printf '\n%s%s%s\n' "$CB" "$title" "$C0"
+	printf '%s%s%s\n' "$CD" "$(rule "$w")" "$C0"
+	printf '%s\n' "$body" | while IFS= read -r line; do
+		printf '%s\n' "$line" | fold -s -w "$((w - 2))"
+	done
 	if [ "$TTY" = 1 ]; then
 		printf '\nPress Enter to continue...'
 		read -r _ || true
@@ -114,10 +136,13 @@ choose() { # header, items... ; prints the chosen item
 	if [ "${#items[@]}" -eq 0 ]; then return 1; fi
 	if [ "$UI" = gum ]; then
 		printf '%s\n' "${items[@]}" |
-			gum choose --header "$header" --height 20 --cursor '❯ ' --cursor.foreground 51
+			gum choose --header "$header" --height 12 --cursor '› ' --no-show-help \
+				--cursor.foreground 231 --cursor.background 24 \
+				--selected.foreground 231 --selected.background 24 \
+				--item.foreground 252 --header.foreground 245
 		return
 	fi
-	printf '\n%s%s%s\n' "$CC" "$header" "$C0" >&2
+	printf '\n%s%s%s\n' "$CB" "$header" "$C0" >&2
 	local i
 	for i in "${!items[@]}"; do
 		printf '  %2d) %s\n' "$((i + 1))" "${items[$i]}" >&2
@@ -152,8 +177,14 @@ confirm() { # question, default no
 }
 
 show_log() {
-	if [ "$UI" = gum ] && [ "$TTY" = 1 ] && have dialog; then
-		dialog --title "ytpro log" --textbox "$LOG" 24 78
+	if [ "$UI" = gum ] && [ "$TTY" = 1 ] && have gum; then
+		if gum pager --help >/dev/null 2>&1; then
+			gum pager --soft-wrap <"$LOG"
+		elif have dialog; then
+			dialog --title "ytpro log" --textbox "$LOG" 24 78
+		else
+			tail -n 40 "$LOG" 2>/dev/null
+		fi
 	else
 		printf '\n%s--- log (%s) ---%s\n' "$CD" "$LOG" "$C0"
 		tail -n 25 "$LOG" 2>/dev/null
@@ -304,16 +335,40 @@ load_meta() {
 }
 
 show_header() {
-	local line1="$TITLE"
-	local line2="$UPLOADER"
-	[ -n "$UPLOADER" ] && line2="$UPLOADER  ·  $(fmt_dur "$DURATION")  ·  $(fmt_count "$VIEWS") views"
-	[ "$LIVE" = 1 ] && line2="$line2  ·  ${CR}LIVE${C0}"
-	if [ "$UI" = gum ]; then
-		printf '%s\n%s\n' "$line1" "$line2" |
-			gum style --border rounded --border-foreground 51 --padding '0 1'
-	else
-		printf '\n%s%s%s\n%s%s%s\n' "$CB" "$line1" "$C0" "$CD" "$line2" "$C0"
+	local w tw i line sub
+	local -a tl=() ul=()
+	w=$(term_cols)
+	tw=$((w - 2))
+	[ "$tw" -lt 10 ] && tw=10
+
+	mapfile -t tl < <(printf '%s\n' "$TITLE" | fold -s -w "$tw")
+	printf '\n'
+	for i in 0 1; do
+		[ -n "${tl[$i]:-}" ] || continue
+		line=${tl[$i]}
+		line=${line#"${line%%[![:space:]]*}"}
+		line=${line%"${line##*[![:space:]]}"}
+		[ -n "$line" ] || continue
+		if [ "$i" -eq 1 ] && [ "${#tl[@]}" -gt 2 ]; then
+			printf '%s%s…%s\n' "$CB" "$line" "$C0"
+		else
+			printf '%s%s%s\n' "$CB" "$line" "$C0"
+		fi
+	done
+
+	if [ -n "$UPLOADER" ]; then
+		mapfile -t ul < <(printf '%s\n' "$UPLOADER" | fold -s -w "$tw")
+		if [ "${#ul[@]}" -gt 1 ]; then
+			printf '%s%s…%s\n' "$CD" "${ul[0]}" "$C0"
+		else
+			printf '%s%s%s\n' "$CD" "${ul[0]:-}" "$C0"
+		fi
 	fi
+
+	sub="$(fmt_dur "$DURATION")  ·  $(fmt_count "$VIEWS") views"
+	[ "$LIVE" = 1 ] && sub="$sub  ·  ${CR}LIVE${C0}"
+	printf '%s%s%s\n' "$CD" "$sub" "$C0"
+	printf '%s%s%s\n\n' "$CD" "$(rule "$w")" "$C0"
 }
 
 # ------------------------------------------------------------------ download
@@ -330,7 +385,7 @@ as_int() {
 	esac
 }
 
-render_bar() { # status downloaded total speed eta
+render_bar() { # status downloaded total speed eta (label in DL_LABEL)
 	local status=$1 dl total speed eta
 	dl=$(as_int "$2")
 	total=$(as_int "$3")
@@ -347,32 +402,66 @@ render_bar() { # status downloaded total speed eta
 		eta=$(((total - dl) / speed))
 	fi
 
-	local pct=0 width=${COLUMNS:-50}
-	case $width in '' | *[!0-9]*) width=50 ;; esac
-	[ "$width" -gt 40 ] && width=40
-	[ "$width" -lt 20 ] && width=20
-	width=$((width / 2))
+	local pct=0
 	if [ "$total" -gt 0 ]; then pct=$((dl * 100 / total)); fi
 	[ "$pct" -gt 100 ] && pct=100
 	if [ "$status" = finished ]; then pct=100; fi
-	local filled=$((pct * width / 100))
-	local bar pad
-	printf -v bar '%*s' "$filled" ''
-	printf -v pad '%*s' "$((width - filled))" ''
-	bar=${bar// /#}
-	pad=${pad// /-}
-	local sp="" eta_s=""
-	[ "$speed" -gt 0 ] && sp="$(human_size "$speed")/s  "
-	if [ "$eta" -gt 0 ] && [ "$pct" -lt 100 ]; then
-		eta_s="ETA $(fmt_dur "$eta")  "
-	fi
-	local detail
+
+	# one redraw per second plus the final frame: no scrolling wall
+	if [ "$status" != finished ] && [ "${LAST_DRAW:-0}" = "$now" ]; then return 0; fi
+	LAST_DRAW=$now
+
+	local cols max prefix suffix pctxt sp etatxt fixed barw
+	cols=$(term_cols)
+	max=$((cols - 1))
+	prefix="${DL_LABEL:-Downloading}  "
+	[ "${#prefix}" -gt $((max / 2)) ] && prefix="${prefix:0:$((max / 2))}  "
+
 	if [ "$total" -gt 0 ]; then
-		detail="$(human_size "$dl") / $(human_size "$total")"
+		printf -v pctxt '%3d%%' "$pct"
 	else
-		detail="$(human_size "$dl")"
+		pctxt=" -- "
 	fi
-	printf '\r%s[%s%s] %3d%%  %s%s%s%s' "$CC" "$bar" "$pad" "$pct" "$sp" "$eta_s" "$detail" "$C0"
+	sp=""
+	[ "$speed" -gt 0 ] && sp="$(human_size "$speed")/s"
+	etatxt=""
+	if [ "$eta" -gt 0 ] && [ "$pct" -lt 100 ] && [ "$pct" -ge 1 ]; then
+		etatxt="ETA $(fmt_dur "$eta")"
+	fi
+	suffix="  ${pctxt}"
+	[ -n "$sp" ] && suffix="$suffix  $sp"
+	[ -n "$etatxt" ] && suffix="$suffix  $etatxt"
+	if [ "$total" -le 0 ] && [ "$dl" -gt 0 ]; then suffix="$suffix  $(human_size "$dl")"; fi
+
+	fixed=$((${#prefix} + 2 + ${#suffix}))
+	barw=$((max - fixed))
+	if [ "$barw" -lt 8 ] && [ -n "$etatxt" ]; then
+		etatxt=""
+		suffix="  ${pctxt}"
+		[ -n "$sp" ] && suffix="$suffix  $sp"
+		fixed=$((${#prefix} + 2 + ${#suffix}))
+		barw=$((max - fixed))
+	fi
+	if [ "$fixed" -gt "$max" ]; then
+		suffix="  ${pctxt}"
+		fixed=$((${#prefix} + ${#suffix}))
+		[ "$fixed" -gt "$max" ] && prefix="${prefix:0:$((max - ${#suffix} - 1))}"
+		barw=0
+	fi
+	if [ "$barw" -lt 8 ]; then
+		printf '\r\033[K%s%s%s%s' "$CB" "$prefix" "$C0" "$suffix"
+		return 0
+	fi
+	[ "$barw" -gt 28 ] && barw=28
+
+	local filled=$((pct * barw / 100))
+	local bar f r
+	printf -v bar '%*s' "$barw" ''
+	f=${bar:0:filled}
+	r=${bar:filled}
+	f=${f// /█}
+	r=${r// /░}
+	printf '\r\033[K%s%s%s[%s%s%s%s%s]%s' "$CB" "$prefix" "$C0" "$CC" "$f" "$CD" "$r" "$C0" "$suffix"
 }
 
 start_spin() {
@@ -420,6 +509,7 @@ run_download() { # format, extra args...
 	SPINPID=""
 	FINALIZE_SHOWN=0
 	DL_START=$(date +%s)
+	LAST_DRAW=0
 
 	"$YTDLP" "${args[@]}" >"$FIFO" 2>>"$LOG" &
 	local pid=$!
@@ -466,30 +556,101 @@ result_size() {
 	fi
 }
 
-card_menu() { # title, summary, tag description... ; prints the tag
-	local title=$1 summary=$2
+kv() { # key value width [maxlines]
+	local key=$1 val=$2 width=$3 max=${4:-2}
+	local kw=9
+	local vw=$((width - kw - 2))
+	[ "$vw" -lt 10 ] && vw=10
+	local -a lines=()
+	mapfile -t lines < <(printf '%s\n' "$val" | fold -s -w "$vw")
+	local line1=${lines[0]:-} line2=${lines[1]:-} line3=${lines[2]:-}
+	if [ "${#lines[@]}" -gt "$max" ]; then
+		case $max in
+		1) line1="${line1% }…" ;;
+		2) line2="${line2% }…" ;;
+		*) line3="${line3% }…" ;;
+		esac
+	fi
+	printf '%s%-*s%s  %s\n' "$CD" "$kw" "$key" "$C0" "$line1"
+	[ "$max" -ge 2 ] && [ -n "$line2" ] && printf '%*s  %s\n' "$kw" '' "$line2"
+	[ "$max" -ge 3 ] && [ -n "$line3" ] && printf '%*s  %s\n' "$kw" '' "$line3"
+}
+
+result_body() { # title quality size time file
+	local title=$1 quality=$2 size=$3 time=$4 file=$5 w
+	w=$(term_cols)
+	kv "Title" "$title" "$w" 2
+	kv "Quality" "$quality" "$w" 1
+	kv "Size" "$size" "$w" 1
+	kv "Time" "$time" "$w" 1
+	if [ -n "$file" ] && [ -f "$file" ]; then
+		kv "File" "$(basename "$file")" "$w" 3
+		kv "Folder" "$(dirname "$file")" "$w" 1
+	else
+		kv "Folder" "$OUTDIR" "$w" 1
+	fi
+}
+
+error_body() { # quality error
+	local w
+	w=$(term_cols)
+	kv "Quality" "$1" "$w" 1
+	kv "Error" "${2:-Unknown error}" "$w" 3
+}
+
+card_menu() { # title, body, tag description... ; prints the tag
+	local title=$1 body=$2
 	shift 2
-	local -a tags=() dlg=()
+	local -a tags=() desc=()
 	while [ "$#" -gt 0 ]; do
 		tags+=("$1")
-		dlg+=("$1" "${2:-}")
+		desc+=("${2:-}")
 		shift 2
 	done
 	[ "${#tags[@]}" -gt 0 ] || return 1
-	if [ "$UI" = gum ] && [ "$TTY" = 1 ] && have dialog; then
-		local action
-		action=$(dialog --title "$title" --menu "$summary" 24 78 10 "${dlg[@]}" 3>&1 1>&2 2>&3) || action=""
-		[ -z "$action" ] && action=${tags[0]}
+
+	if [ "$UI" = gum ] && [ "$TTY" = 1 ] && have gum; then
+		local w tone mark i action choice
+		w=$(term_cols)
+		tone=$CG
+		mark='✓'
+		case $title in *failed* | *Failed*) tone=$CR; mark='!' ;; esac
+		{
+			clear_screen
+			printf '\n%s%s %s%s\n' "$tone" "$mark" "$title" "$C0"
+			printf '%s%s%s\n' "$CD" "$(rule "$w")" "$C0"
+			printf '%s\n' "$body"
+			[ -n "${CARD_NOTE:-}" ] && printf '%s%s%s\n' "$CG" "$CARD_NOTE" "$C0"
+			printf '\n'
+		} >&2
+
+		local -a labels=()
+		for i in "${!tags[@]}"; do
+			labels+=("$(printf '%-6s  %s' "${tags[$i]}" "${desc[$i]}")")
+		done
+		choice=$(printf '%s\n' "${labels[@]}" |
+			gum choose --header "What next?" --height 6 --cursor '› ' --no-show-help \
+				--cursor.foreground 231 --cursor.background 24 \
+				--selected.foreground 231 --selected.background 24 \
+				--item.foreground 252 --header.foreground 245) || choice="${labels[0]}"
+		action=${choice%% *}
 		printf '%s\n' "$action"
 	else
-		printf '\n%s%s%s\n%s\n' "$CB" "$title" "$C0" "$summary" >&2
-		choose "$title" "${tags[@]}"
+		local w
+		w=$(term_cols)
+		{
+			printf '\n%s%s%s\n' "$CB" "$title" "$C0"
+			printf '%s%s%s\n' "$CD" "$(rule "$w")" "$C0"
+			printf '%s\n' "$body"
+			[ -n "${CARD_NOTE:-}" ] && printf '%s%s\n' "$CG" "$CARD_NOTE"
+		} >&2
+		choose "What next?" "${tags[@]}"
 	fi
 }
 
 finish_card() { # summary
 	local summary=$1
-	shift
+	CARD_NOTE=""
 	while :; do
 		local action
 		if [ "${PLAYLIST:-0}" = 1 ]; then
@@ -506,14 +667,17 @@ finish_card() { # summary
 		case $action in
 		Play)
 			if [ -n "${FILE:-}" ] && [ -f "${FILE:-}" ] && have termux-open; then
-				termux-open "$FILE" >/dev/null 2>&1 || notify "No app can open this file"
+				if termux-open "$FILE" >/dev/null 2>&1; then CARD_NOTE="Opened in player"; else notify "No app can open this file"; fi
 			elif [ -n "${FILE:-}" ]; then
 				notify "File not found: $FILE"
 			fi
 			;;
 		Copy)
 			if [ -n "${FILE:-}" ] && have termux-clipboard-set; then
-				termux-clipboard-set "$FILE" >/dev/null 2>&1 && notify "Path copied"
+				if termux-clipboard-set "$FILE" >/dev/null 2>&1; then
+					notify "Path copied"
+					CARD_NOTE="Path copied"
+				fi
 			else
 				notify "Clipboard unavailable"
 			fi
@@ -526,13 +690,17 @@ finish_card() { # summary
 
 error_card() { # summary ; prints Retry|Log|Exit
 	local summary=$1
+	CARD_NOTE=""
 	card_menu "Download failed" "$summary" \
 		"Retry" "Try the same download again" \
 		"Log" "Show log" \
 		"Exit" "Exit ytpro"
 }
 
-cancel_card() { msgbox "Cancelled" "Download cancelled."; }
+cancel_card() {
+	clear_screen >&2
+	msgbox "Cancelled" "Download cancelled."
+}
 
 finish() { # exit code
 	local code=${1:-0}
@@ -579,8 +747,8 @@ $(last_error)"
 	local mode
 	mode=$(choose "What do you want to do?" \
 		"Play audio (stream, no download)" \
-		"Download video" \
-		"Download audio") || mode="Play audio (stream, no download)"
+		"Download video (choose quality)" \
+		"Download audio (native or MP3)") || mode="Play audio (stream, no download)"
 
 	if [ "$mode" = "Play audio (stream, no download)" ]; then
 		if [ -z "$MPV" ]; then
@@ -595,20 +763,24 @@ $(last_error)"
 	fi
 
 	# ------------------------------ video
-	if [ "$mode" = "Download video" ]; then
+	if [ "$mode" = "Download video (choose quality)" ]; then
 		if [ "${#V_ID[@]}" -eq 0 ]; then
 			msgbox "ytpro" "No video formats were found for this link."
 			finish 1
 			return
 		fi
-		local -a labels=() ids=() aids=() sizes=()
+		local -a labels=() ids=() aids=() sizes=() vq=()
 		local i
-		labels+=("Best available — ${V_H[0]}p · ${V_CODEC[0]} · $(human_size "${V_SIZE[0]}")")
+		local res0="${V_H[0]}p"
+		[ "${V_FPS[0]}" -ge 50 ] 2>/dev/null && res0="${res0}${V_FPS[0]}"
+		labels+=("Best available (${res0} ${V_CODEC[0]})  $(human_size "${V_SIZE[0]}")")
+		vq+=("${V_H[0]}p ${V_CODEC[0]} ${V_EXT[0]}")
 		ids+=("${V_ID[0]}") aids+=("${V_AID[0]}") sizes+=("${V_SIZE[0]}")
 		for i in "${!V_ID[@]}"; do
-			local fps_txt=""
-			[ "${V_FPS[$i]}" -ge 50 ] 2>/dev/null && fps_txt=" · ${V_FPS[$i]}fps"
-			labels+=("${V_H[$i]}p${fps_txt} · ${V_CODEC[$i]} · ${V_EXT[$i]} · $(human_size "${V_SIZE[$i]}")")
+			local res="${V_H[$i]}p"
+			[ "${V_FPS[$i]}" -ge 50 ] 2>/dev/null && res="${res}${V_FPS[$i]}"
+			labels+=("$(printf '%-7s %-5s %9s' "$res" "${V_CODEC[$i]}" "$(human_size "${V_SIZE[$i]}")")")
+			vq+=("${V_H[$i]}p ${V_CODEC[$i]} ${V_EXT[$i]}")
 			ids+=("${V_ID[$i]}") aids+=("${V_AID[$i]}") sizes+=("${V_SIZE[$i]}")
 		done
 
@@ -616,7 +788,7 @@ $(last_error)"
 		if [ "$PLAYLIST" = 1 ]; then
 			pick=""
 		else
-			pick=$(choose "Video quality — $TITLE" "${labels[@]}") || pick="${labels[0]}"
+			pick=$(choose "Video quality (mp4 + best audio)" "${labels[@]}") || pick="${labels[0]}"
 		fi
 		idx=0
 		if [ -n "$pick" ]; then
@@ -650,15 +822,17 @@ $(last_error)"
 
 		local quality
 		if [ "$PLAYLIST" = 1 ]; then
-			quality="Whole playlist · best quality"
+			quality="Whole playlist (best)"
 		else
-			quality=${labels[$idx]}
+			quality=${vq[$idx]}
 		fi
 		local -a merge=()
 		if [ -n "$aid" ] || [ "$PLAYLIST" = 1 ]; then
 			merge=(--merge-output-format mp4)
 		fi
 
+		DL_LABEL="Video"
+		[ "$PLAYLIST" = 1 ] && DL_LABEL="Playlist"
 		SECONDS=0
 		while :; do
 			CANCELLED=0
@@ -671,23 +845,24 @@ $(last_error)"
 			fi
 			FILE=$(result_path || true)
 			if [ "$rc" = 0 ]; then
-				local bytes summary sizetxt
+				local bytes summary sizetxt title_txt
 				bytes=$(result_size "${FILE:-}")
+				title_txt=$TITLE
 				if [ "$PLAYLIST" = 1 ]; then
 					FILE=""
-					sizetxt="playlist"
+					title_txt="Playlist"
+					sizetxt="multiple files"
 				else
 					sizetxt=$(human_size "$bytes")
 				fi
-				summary=$(printf 'Title   : %s\nQuality : %s\nSize    : %s\nTime    : %ss\nPath    : %s' \
-					"$TITLE" "$quality" "$sizetxt" "$SECONDS" "${FILE:-$OUTDIR/}")
+				summary=$(result_body "$title_txt" "$quality" "$sizetxt" "$(fmt_dur "$SECONDS")" "${FILE:-}")
 				notify "Download complete"
 				finish_card "$summary"
 				finish 0
 				return
 			fi
 			local action esummary
-			esummary=$(printf 'Quality : %s\n\n%s\n\nLog: %s' "$quality" "$(last_error)" "$LOG")
+			esummary=$(error_body "$quality" "$(last_error)")
 			while :; do
 				action=$(error_card "$esummary") || action=Exit
 				case $action in
@@ -700,18 +875,21 @@ $(last_error)"
 	fi
 
 	# ------------------------------ audio
-	local -a alabels=() akind=() aid2=() aq=() asize=()
+	local -a alabels=() akind=() aid2=() aq=() asize=() aqshort=()
 	local i
 	if [ "${#A_ID[@]}" -gt 0 ]; then
-		alabels+=("Best native — ${A_ABR[0]}k ${A_CODEC[0]} · $(human_size "${A_SIZE[0]}")")
+		alabels+=("Best native (${A_ABR[0]}k ${A_CODEC[0]})  $(human_size "${A_SIZE[0]}")")
+		aqshort+=("${A_ABR[0]}k ${A_CODEC[0]}")
 		akind+=("native") aid2+=("${A_ID[0]}") aq+=("") asize+=("${A_SIZE[0]}")
 		for i in "${!A_ID[@]}"; do
-			alabels+=("${A_ABR[$i]}k ${A_CODEC[$i]} · ${A_EXT[$i]} · $(human_size "${A_SIZE[$i]}")")
+			alabels+=("$(printf '%-7s %-5s %9s' "${A_ABR[$i]}k" "${A_CODEC[$i]}" "$(human_size "${A_SIZE[$i]}")")")
+			aqshort+=("${A_ABR[$i]}k ${A_CODEC[$i]}")
 			akind+=("native") aid2+=("${A_ID[$i]}") aq+=("") asize+=("${A_SIZE[$i]}")
 		done
 	fi
 	for i in 320 192 128; do
-		alabels+=("MP3 ${i}k (re-encode)")
+		alabels+=("MP3 ${i}k  (re-encode)")
+		aqshort+=("MP3 ${i}k")
 		akind+=("mp3") aid2+=("") aq+=("$i") asize+=("0")
 	done
 	if [ "${#alabels[@]}" -eq 0 ]; then
@@ -721,7 +899,7 @@ $(last_error)"
 	fi
 
 	local apick aidx
-	apick=$(choose "Audio quality — $TITLE" "${alabels[@]}") || apick="${alabels[0]}"
+	apick=$(choose "Audio quality (native or MP3)" "${alabels[@]}") || apick="${alabels[0]}"
 	aidx=0
 	for i in "${!alabels[@]}"; do
 		if [ "${alabels[$i]}" = "$apick" ]; then aidx=$i; break; fi
@@ -735,12 +913,14 @@ $(last_error)"
 		aextra=(-x --audio-format mp3 --audio-quality "${aq[$aidx]}K")
 	elif [ "$PLAYLIST" = 1 ]; then
 		afmt="ba"
-		aquality="Whole playlist · best audio"
+		aquality="Whole playlist (best)"
 	else
 		afmt=${aid2[$aidx]}
-		aquality=${alabels[$aidx]}
+		aquality=${aqshort[$aidx]}
 	fi
 
+	DL_LABEL="Audio"
+	[ "$PLAYLIST" = 1 ] && DL_LABEL="Playlist"
 	SECONDS=0
 	while :; do
 		CANCELLED=0
@@ -753,23 +933,24 @@ $(last_error)"
 		fi
 		FILE=$(result_path || true)
 		if [ "$rc" = 0 ]; then
-			local bytes summary sizetxt
+			local bytes summary sizetxt title_txt
 			bytes=$(result_size "${FILE:-}")
+			title_txt=$TITLE
 			if [ "$PLAYLIST" = 1 ]; then
 				FILE=""
-				sizetxt="playlist"
+				title_txt="Playlist"
+				sizetxt="multiple files"
 			else
 				sizetxt=$(human_size "$bytes")
 			fi
-			summary=$(printf 'Title   : %s\nQuality : %s\nSize    : %s\nTime    : %ss\nPath    : %s' \
-				"$TITLE" "$aquality" "$sizetxt" "$SECONDS" "${FILE:-$OUTDIR/}")
+			summary=$(result_body "$title_txt" "$aquality" "$sizetxt" "$(fmt_dur "$SECONDS")" "${FILE:-}")
 			notify "Download complete"
 			finish_card "$summary"
 			finish 0
 			return
 		fi
 		local action esummary
-		esummary=$(printf 'Quality : %s\n\n%s\n\nLog: %s' "$aquality" "$(last_error)" "$LOG")
+		esummary=$(error_body "$aquality" "$(last_error)")
 		while :; do
 			action=$(error_card "$esummary") || action=Exit
 			case $action in

@@ -17,8 +17,8 @@ speed/ETA, and a completion card when the download finishes.
   the result is muxed to MP4 when possible.
 - **Audio list:** native streams ranked by bitrate (best preselected) plus MP3
   re-encodes at 320/192/128 kbps at the bottom.
-- **Live progress:** bar with percent, speed, ETA, and downloaded/total size. A
-  spinner covers merge/convert time. Downloads over 1 GiB ask first.
+- **Live progress:** one clean bar with percent, speed, and ETA. A spinner
+  covers merge/convert time. Downloads over 1 GiB ask first.
 - **Blocking result card:** Done (Enter), Play, Copy path, Show log. `Ctrl+C`
   during a download shows a cancel card and exits cleanly.
 - **Playlists:** choose this video only (default) or the whole playlist.
@@ -46,7 +46,7 @@ directory):
 ```bash
 pkg upgrade -y
 pkg install git -y
-git clone https://github.com/BDhaCkers009/ytpro.git
+git clone https://github.com/BDhackers009/ytpro.git
 cd ytpro
 bash tuo-install.sh
 ```
@@ -73,7 +73,7 @@ up an existing config to `config.bak`, and installs:
 5. The share session ends when you choose **Done**.
 
 Downloads land in **`/sdcard/YouTube`** using
-`%(title)s-%(uploader)s.%(ext)s`.
+`%(title)s-[%(id)s].%(ext)s`.
 
 ### Notes
 
