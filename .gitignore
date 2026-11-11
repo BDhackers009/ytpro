@@ -1,0 +1,7 @@
+# local-only tooling; do not publish
+test/
+AGENTS.md
+
+# scratch
+.ytpro-*
+*.log

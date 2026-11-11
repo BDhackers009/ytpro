@@ -1,4 +1,6 @@
 #!/bin/bash
+# ytpro installer - run from the repo root inside Termux:
+#   bash tuo-install.sh
 
 starts() {
 	clear
@@ -17,7 +19,7 @@ starts() {
 }
 
 install_pkgs() {
-	pkgs=(python mpv ffmpeg)
+	pkgs=(python mpv ffmpeg dialog gum deno)
 
 	for i in "${pkgs[@]}"; do
 		if [[ ! $(command -v "$i") ]]; then
@@ -44,7 +46,7 @@ config_s() {
 	for d in "${directory[@]}"; do
 		if [[ ! -d "$d" ]]; then
 			echo "Creating Directory : $d"
-			mkdir -p $d
+			mkdir -p "$d"
 		fi
 	done
 
@@ -52,17 +54,17 @@ config_s() {
 	for c in "${confs[@]}"; do
 		if [[ -e "$c" ]]; then
 			echo "Backing Up : $c"
-			mv $c "${c}.bak"
+			mv "$c" "${c}.bak"
 		fi
-		if [[ -e $(basename $c) ]]; then
-			cp $(basename $c) "$c"
+		if [[ -e $(basename "$c") ]]; then
+			cp "$(basename "$c")" "$c"
 			chmod 777 "$c"
 		else
 			echo -e "\nSome Config files not found,,,Clone Again\n"
 			exit 0
 		fi
 	done
-	
+
 	echo -e "\nConfiguration Completed !!\n"
 }
 

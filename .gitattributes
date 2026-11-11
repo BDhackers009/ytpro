@@ -1,0 +1,7 @@
+* text=auto
+*.sh text eol=lf
+*.md text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+termux-url-opener text eol=lf
+config text eol=lf
